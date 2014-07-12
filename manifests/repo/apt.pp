@@ -23,6 +23,12 @@ class sensu::repo::apt {
       $url = 'http://repos.sensuapp.org/apt'
     }
 
+    if $ensure == 'present' {
+      apt::key { 'sensu':
+        key         => $sensu::repo_key_id,
+        key_source  => $sensu::repo_key_source,
+      }
+    }
     apt::source { 'sensu':
       ensure      => $ensure,
       location    => $url,
@@ -30,11 +36,6 @@ class sensu::repo::apt {
       repos       => $sensu::repo,
       include_src => false,
       before      => Package['sensu'],
-    }
-
-    apt::key { 'sensu':
-      key         => '7580C77F',
-      key_source  => "${url}/pubkey.gpg",
     }
 
   } else {

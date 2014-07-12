@@ -22,6 +22,14 @@
 # [*repo_source*]
 #   String.  Location of the yum/apt repo.  Overrides the default location
 #   Default: undef
+
+# [*repo_key_id*]
+#   String.  The apt GPG key id
+#   Default: 7580C77F
+#
+# [*repo_key_source*]
+#   String.  URL of the apt GPG key
+#   Default: http://repos.sensuapp.org/apt/pubkey.gpg
 #
 # [*client*]
 #   Boolean.  Include the sensu client
@@ -71,7 +79,7 @@
 #
 # [*rabbitmq_vhost*]
 #   String.  Rabbitmq vhost to be used by sensu
-#   Default: '/sensu'
+#   Default: 'sensu'
 #
 # [*rabbitmq_ssl_private_key*]
 #   String.  Private key to be used by sensu to connect to rabbitmq
@@ -91,6 +99,9 @@
 #   Integer.  Redis port to be used by sensu
 #   Default: 6379
 #
+# [*api_bind*]
+#   String.  IP to bind api service
+#   Default: 0.0.0.0
 # [*api_host*]
 #   String.  Hostname of the sensu api service
 #   Default: localhost
@@ -172,6 +183,8 @@ class sensu (
   $install_repo             = true,
   $repo                     = 'main',
   $repo_source              = undef,
+  $repo_key_id              = '7580C77F',
+  $repo_key_source          = 'http://repos.sensuapp.org/apt/pubkey.gpg',
   $client                   = true,
   $server                   = false,
   $api                      = false,
@@ -187,15 +200,18 @@ class sensu (
   $rabbitmq_ssl_cert_chain  = undef,
   $redis_host               = 'localhost',
   $redis_port               = 6379,
+  $api_bind                 = '0.0.0.0',
   $api_host                 = 'localhost',
   $api_port                 = 4567,
   $api_user                 = undef,
   $api_password             = undef,
+  $dashboard_bind           = '0.0.0.0',
   $dashboard_host           = $::ipaddress,
   $dashboard_port           = 8080,
   $dashboard_user           = 'admin',
   $dashboard_password       = 'secret',
   $subscriptions            = [],
+  $client_bind              = '127.0.0.1',
   $client_address           = $::ipaddress,
   $client_name              = $::fqdn,
   $client_custom            = {},
@@ -216,6 +232,27 @@ class sensu (
   if !is_integer($redis_port) { fail('redis_port must be an integer') }
   if !is_integer($api_port) { fail('api_port must be an integer') }
   if !is_integer($dashboard_port) { fail('dashboard_port must be an integer') }
+
+  # Ugly hack for notifications, better way?
+  # Put here to avoid computing the conditionals for every check
+  if $client and $server and $api {
+    $check_notify = [ Class['sensu::client::service'], Class['sensu::server::service'], Class['sensu::api::service'] ]
+  } elsif $client and $server {
+    $check_notify = [ Class['sensu::client::service'], Class['sensu::server::service'] ]
+  } elsif $client and $api {
+    $check_notify = [ Class['sensu::client::service'], Class['sensu::api::service'] ]
+  } elsif $server and $api {
+    $check_notify = [ Class['sensu::server::service'], Class['sensu::api::service'] ]
+  } elsif $server {
+    $check_notify = Class['sensu::server::service']
+  } elsif $client {
+    $check_notify = Class['sensu::client::service']
+  } elsif $api {
+    $check_notify = Class['sensu::api::service']
+  } else {
+    $check_notify = []
+  }
+
 
   # Include everything and let each module determine its state.  This allows
   # transitioning to purged config and stopping/disabling services
